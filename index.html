@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Recetario Pacheco — Todas las recetas</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Small tweak for scroll and sidebar */
+    .sidebar { min-width: 220px; max-width: 260px; }
+    .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  </style>
+</head>
+<body class="bg-rose-50 min-h-screen">
+
+  <div class="min-h-screen flex">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar bg-white shadow-md p-4 hidden md:block sticky top-0 h-screen overflow-auto">
+      <div class="mb-6">
+        <h1 class="text-2xl font-bold text-rose-700">📗 Recetario Pacheco</h1>
+        <p id="sidebarSummary" class="text-sm text-gray-600 mt-1"></p>
+      </div>
+      <nav>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase mb-2">Capítulos</h2>
+        <ul id="chaptersList" class="space-y-1 text-sm"></ul>
+      </nav>
+      <div class="mt-6">
+        <button id="btnAll" class="w-full bg-rose-600 text-white py-2 rounded-lg hover:bg-rose-700 transition">Mostrar todas</button>
+      </div>
+      <p class="text-xs text-gray-400 mt-6">Menú lateral — clic en un capítulo para filtrarlo. En móvil, usá el botón "Menú".</p>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 p-6 md:p-10">
+      <!-- Top bar for mobile (menu + search) -->
+      <div class="flex items-center justify-between mb-6 md:hidden">
+        <button id="mobileMenuBtn" class="bg-white px-3 py-2 rounded-md shadow">☰ Menú</button>
+        <div>
+          <h1 class="text-lg font-bold text-rose-700">📗 Recetario Pacheco</h1>
+          <p id="mobileSummary" class="text-sm text-gray-600">Cargando recetas...</p>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex flex-col md:flex-row gap-4 w-full max-w-4xl mb-6">
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Buscar receta o ingrediente (ej: atún, pesto...)"
+          class="flex-1 p-3 border border-rose-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+        />
+        <select id="categoryFilter" class="p-3 border border-rose-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white">
+          <option value="Todas">Todas las categorías</option>
+        </select>
+      </div>
+
+      <!-- Summary -->
+      <div class="mb-4">
+        <p id="summary" class="text-sm text-gray-600">Cargando recetas...</p>
+      </div>
+
+      <!-- Recipes grid -->
+      <section id="recipeList" class="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3"></section>
+    </main>
+  </div>
+
+  <!-- Mobile sidebar modal -->
+  <div id="mobileSidebar" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex">
+    <div class="bg-white w-72 p-4 overflow-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="font-bold text-rose-700">Capítulos</h2>
+        <button id="mobileClose" class="text-gray-500">✕</button>
+      </div>
+      <ul id="mobileChapters" class="space-y-2 text-sm"></ul>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="recipeModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-11/12 max-w-3xl shadow-lg relative max-h-[90vh] overflow-y-auto">
+      <button id="closeModal" class="absolute top-3 right-4 text-gray-500 hover:text-rose-600 text-2xl leading-none">&times;</button>
+      <h2 id="modalTitle" class="text-2xl font-bold text-rose-700 mb-1"></h2>
+      <p id="modalMeta" class="text-sm text-gray-500 mb-4"></p>
+      <h3 class="text-lg font-semibold text-rose-600 mb-2">Ingredientes:</h3>
+      <ul id="modalIngredients" class="list-disc list-inside mb-4 text-gray-700"></ul>
+      <h3 class="text-lg font-semibold text-rose-600 mb-2">Preparación:</h3>
+      <div id="modalPreparation" class="text-gray-700 whitespace-pre-line mb-6"></div>
+      <div class="text-right">
+        <button id="printBtn" class="bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700 transition">Imprimir receta</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /********************************************************************
+     * Recetas extraídas del PDF "RECETAS PACHECO" (consolidadas).
+     * Cada objeto: { name, category, ingredients[], preparation, time?, portions? }
+     *
+     * Nota: mantuve los nombres de capítulo tal como aparecen en el PDF, y
+     * agregué emojis en la lista de capítulos para el menú lateral.
+     ********************************************************************/
+    const recipes = [
+      // --- Capítulo 1 – Las clásicas de casa
+      { name: 'Milanesas con puré', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['1 kg de carne para milanesas (nalga, cuadrada o bola de lomo)','3 huevos','2 dientes de ajo','Perejil picado','Pan rallado','Sal','Pimienta','1 kg de papas','50 g de manteca','Leche caliente'], preparation: '1. Batir los huevos con ajo y perejil.\n2. Pasar la carne por huevo y pan rallado.\n3. Freír u hornear hasta dorar.\n4. Hervir papas y preparar puré con manteca y leche.\n5. Servir.' , time: '45 minutos', portions: '4' },
+      { name: 'Fideos con Tuco', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['Fideos secos','Carne picada','Tomate triturado','Cebolla','Morrón','Ajo','Vino tinto','Sal','Pimienta'], preparation: '1. Sofreír cebolla, morrón y ajo.\n2. Agregar carne y dorar.\n3. Desglasar con vino, añadir tomate y cocinar 30-40 min.\n4. Hervir fideos y servir con el tuco.' },
+      { name: 'Pollo al horno con papas', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['Pollo trozado','Papas','Cebollas','Aceite de oliva','Ajo','Romero','Sal','Pimienta'], preparation: '1. Precalentar horno 200°C.\n2. Colocar pollo y papas en fuente, condimentar.\n3. Rociar con aceite y hornear 1 hora.' , time: '1 h 10 min'},
+      { name: 'Empanadas criollas', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['500 g carne picada','2 cebollas','1 morrón rojo','2 huevos duros','12 tapas de empanada','Aceitunas','Comino','Pimentón','Aceite'], preparation: '1. Dorar cebolla y morrón.\n2. Agregar carne y condimentos.\n3. Incorporar huevos y aceitunas.\n4. Rellenar tapas y cerrar. Hornear 15-20 min a 200°C.' , time: '1 hora', portions: '12 unidades'},
+      { name: 'Tarta de jamón y queso', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['2 tapas para tarta','200 g jamón cocido','200 g queso mozzarella','2 huevos','100 cc crema de leche','Nuez moscada','Pimienta'], preparation: '1. Forrar molde con tapa.\n2. Colocar jamón y queso en capas.\n3. Batir huevos con crema y volcar.\n4. Cubrir con tapa y hornear ~30-40 min.' , time: '40 min', portions: '6'},
+      { name: 'Arroz con pollo', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['1 taza arroz','4 presas de pollo','1 cebolla','1 morrón','1 tomate','Caldo','Aceite','Sal','Pimienta'], preparation: '1. Dorar presas, reservar.\n2. Rehogar verduras, agregar arroz y caldo.\n3. Volver pollo y cocinar tapado 25 min.' , time: '50 min'},
+      { name: 'Pastel de papas', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['500 g carne picada','1 cebolla','1 zanahoria rallada','1 morrón','1 kg papas','Manteca','Leche','Sal','Pimienta'], preparation: '1. Preparar puré con papas, manteca y leche.\n2. Hacer relleno con carne rehogada.\n3. Montar en fuente y gratinar.' , time: '1 h'},
+      { name: 'Tortilla de papas', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['6 papas medianas','1 cebolla','6 huevos','Aceite','Sal','Pimienta'], preparation: '1. Freír papas y cebolla hasta tiernas.\n2. Mezclar con huevos y cuajar en sartén.' , time: '35 min'},
+      { name: 'Berenjenas en escabeche', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['1 kg berenjenas','Vinagre','Agua','Ajo','Orégano','Ají molido','Aceite'], preparation: '1. Hervir berenjenas en agua y vinagre 10 min.\n2. Escurrir y guardar en frascos con ajo y aceite.\n3. Reposar 48 h antes de consumir.' , time: '1 h'},
+      { name: 'Omelette simple y relleno', category: '🥕 Capítulo 1 – Las clásicas de casa', ingredients: ['2 huevos','Sal','Pimienta','Manteca o aceite','Relleno a gusto'], preparation: '1. Batir huevos con sal y pimienta.\n2. Cocinar en sartén y añadir relleno antes de doblar.' , time: '10 min', portions: '1' },
+
+      // --- Capítulo 2 – Guisos, sopas y cazuelas
+      { name: 'Guiso de lentejas', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['2 tazas de lentejas','1 cebolla','1 zanahoria','1 morrón','1 papa','1 tomate','Chorizo (opcional)','Laurel','Caldo','Pimentón','Sal','Pimienta'], preparation: '1. Rehogar verduras.\n2. Agregar tomate, chorizo y lentejas.\n3. Cubrir con caldo y cocinar ~40 min.' },
+      { name: 'Guiso de arroz', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['1 taza arroz','½ cebolla','½ morrón','1 zanahoria','200 g carne picada','Tomate','Caldo'], preparation: 'Rehogar, agregar arroz y caldo, cocinar tapado 15-20 min.' },
+      { name: 'Locro criollo', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['Maíz blanco partido','Porotos','Zapallo','Cortes de cerdo','Carne vacuna','Chorizo colorado','Cebolla','Pimentón','Ají molido'], preparation: '1. Remojar maíz y porotos.\n2. Cocinar con carnes y zapallo 2-3 h hasta espesar.' },
+      { name: 'Cazuela de pollo y verduras', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['Pollo en trozos','Cebolla','Zanahoria','Papa','Zapallito','Tomate','Caldo','Perejil'], preparation: '1. Dorar pollo, agregar verduras y caldo.\n2. Cocinar hasta tiernas.' },
+      { name: 'Polenta con tuco', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['Polenta','Agua o leche','Manteca','Queso rallado','Tuco (carne, tomate)'], preparation: '1. Preparar tuco.\n2. Hacer polenta en agua/leche con manteca; servir con tuco.' },
+      { name: 'Estofado de carne con papas', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['Carne en cubos','Papas','Cebolla','Zanahoria','Tomate','Caldo','Laurel'], preparation: '1. Dorar carne.\n2. Agregar verduras y caldo; cocinar 45-60 min.' },
+      { name: 'Sopa casera de verduras', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['Zanahoria','Papa','Zapallito','Cebolla','Zapallo','Apio','Caldo'], preparation: 'Hervir verduras en caldo hasta tiernas; servir.' },
+      { name: 'Lentejas con chorizo', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['Lentejas','Cebolla','Zanahoria','Morron','Chorizos','Tomate','Caldo'], preparation: 'Rehogar y cocinar con lentejas y chorizos hasta tiernas.' },
+      { name: 'Sopa crema de calabaza', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['Calabaza','Papa','Cebolla','Caldo','Crema (opcional)','Nuez moscada'], preparation: 'Hervir, licuar y ajustar condimentos.' },
+      { name: 'Guiso de mondongo', category: '🍲 Capítulo 2 – Guisos, sopas y cazuelas', ingredients: ['Mondongo','Cebolla','Morrón','Tomate','Papa','Zanahoria','Chorizo (opcional)'], preparation: 'Hervir mondongo y cocinar con verduras y condimentos hasta tierno.' },
+
+      // --- Capítulo 3 – Pollo y aves
+      { name: 'Pollo al verdeo', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Supremas de pollo','Cebolla','Cebolla de verdeo','Crema de leche','Aceite','Sal','Pimienta'], preparation: '1. Sellar supremas.\n2. Rehogar cebolla y verdeo, añadir crema y cocinar 10 min.' , time: '45 min', portions: '4'},
+      { name: 'Pollo a la mostaza', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Presas de pollo','Cebolla','Mostaza','Crema de leche','Aceite'], preparation: 'Sellar pollo, añadir mostaza y crema, cocinar tapado 25 min.' , time: '50 min'},
+      { name: 'Supremas rellenas de jamón y queso', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Supremas','Jamón','Queso','Pan rallado','Huevo','Harina'], preparation: 'Rellenar, empanar y freír u hornear.' , time: '50 min'},
+      { name: 'Milanesas de pollo', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Supremas de pollo','Huevos','Pan rallado','Ajo','Perejil'], preparation: 'Empanar y cocinar.' },
+      { name: 'Canelones de pollo', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Panqueques','Pollo desmenuzado','Salsa blanca','Queso'], preparation: 'Rellenar panqueques, cubrir con salsa y gratinar.' , time: '1 h 30 min'},
+      { name: 'Tarta de pollo', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Tapas de tarta','Pollo cocido','Cebolla','Morrón','Huevos','Crema'], preparation: 'Hacer relleno, volcar sobre masa y hornear ~40 min.' },
+      { name: 'Pollo al limón', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Supremas de pollo','Jugo de limón','Miel (opcional)','Orégano'], preparation: 'Marinar con limón/miel y cocinar en sartén.' , time: '40 min'},
+      { name: 'Curry de pollo', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Pechugas','Cebolla','Ajo','Curry','Leche de coco'], preparation: 'Rehogar, dorar pollo, añadir curry y leche de coco, cocinar 25 min.' , time: '1 h'},
+      { name: 'Pollo a la cerveza', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Pollo trozado','Cerveza','Cebolla','Laurel'], preparation: 'Sellar pollo, añadir cerveza y laurel, cocinar 45-60 min.' },
+      { name: 'Pollo braseado al vino blanco', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Pollo trozado','Vino blanco','Cebolla','Laurel'], preparation: 'Sellar pollo; añadir vino y cocinar tapado 40 min.' },
+      { name: 'Nuggets de pollo caseros', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Pechugas','Huevo','Pan rallado'], preparation: 'Procesar pollo, formar nuggets, empanar y cocinar.' },
+      { name: 'Ensalada tibia de pollo', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Pechuga grillada','Lechuga','Tomate','Zanahoria','Limón','Aceite'], preparation: 'Mezclar pollo con vegetales y aderezo.' },
+      { name: 'Wok de pollo con vegetales', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Pechugas','Zanahoria','Morrón','Zucchini','Salsa de soja'], preparation: 'Saltear pollo y vegetales en wok; condimentar.' },
+      { name: 'Pollo al disco', category: '🐔 Capítulo 3 – Pollo y aves', ingredients: ['Pollo trozado','Morrón','Cebolla','Tomate','Vino blanco','Caldo'], preparation: 'Cocinar en disco con verduras y vino.' },
+
+      // --- Capítulo 4 – Carnes de vaca y cerdo
+      { name: 'Asado al horno con papas', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Asado de tira','Papas','Ajo','Romero','Aceite'], preparation: 'Hornear 1.5–2 h; dorar al final.' },
+      { name: 'Bife a la criolla', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Bifes','Cebolla','Morrones','Tomate','Papas','Puré de tomate'], preparation: 'Dorar bifes y cocinar con verduras y papas 40 min.' },
+      { name: 'Matambre a la pizza', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Matambre','Salsa de tomate','Mozzarella','Orégano'], preparation: 'Hervir matambre, cubrir con salsa y queso; gratinar.' },
+      { name: 'Milanesas de cerdo', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Fetas de cerdo','Huevos','Ajo','Perejil','Pan rallado'], preparation: 'Empanar y cocinar.' },
+      { name: 'Bondiola al horno con miel y mostaza', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Bondiola','Miel','Mostaza','Ajo','Limón'], preparation: 'Marinar y hornear 1½ h pincelando con la mezcla.' },
+      { name: 'Estofado de cerdo con verduras', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Cerdo','Cebolla','Zanahoria','Morrón','Papa','Caldo'], preparation: 'Dorar, añadir caldo y cocinar 40-50 min.' },
+      { name: 'Albóndigas con salsa', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Carne picada','Huevo','Pan rallado','Ajo','Perejil','Salsa de tomate'], preparation: 'Formar albóndigas, dorar y cocinar en salsa 25 min.' },
+      { name: 'Churrascos con cebolla y morrón', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Churrascos','Cebolla','Morrón','Aceite'], preparation: 'Dorar churrascos y agregar cebolla y morrón.' },
+      { name: 'Costillitas de cerdo a la barbacoa', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Costillitas','Salsa BBQ','Miel','Vinagre'], preparation: 'Marinar y hornear 1 h; pincelar y dorar.' },
+      { name: 'Carne al horno con batatas', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Carne para horno','Batatas','Cebolla','Ajo','Romero'], preparation: 'Hornear 1½ h, dorar al final.' },
+      { name: 'Lomo a la mostaza', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Lomo','Mostaza','Crema','Manteca','Vino blanco'], preparation: 'Sellar lomo, añadir mostaza y crema, cocinar 10 min.' },
+      { name: 'Matambre arrollado', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Matambre','Huevos duros','Zanahoria','Morrón','Perejil'], preparation: 'Rellenar, enrollar y hervir 1½ h; enfriar y cortar.' },
+      { name: 'Cerdo a la cerveza', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Carré o paleta','Cerveza','Cebolla','Miel','Mostaza'], preparation: 'Dorar, añadir cerveza y cocinar 45 min.' },
+      { name: 'Tiritas de asado a la cacerola', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Tiritas de asado','Cebolla','Morrón','Vino tinto'], preparation: 'Dorar y cocinar 1 h con vino y verduras.' },
+      { name: 'Bife de chorizo a la plancha', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Bifes de chorizo','Sal gruesa','Pimienta','Manteca'], preparation: 'Cocinar 3-4 min por lado en plancha caliente.' },
+      { name: 'Carré relleno', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Carré deshuesado','Jamón','Queso','Morron asado'], preparation: 'Rellenar, atar, dorar y hornear 1 h.' },
+      { name: 'Chorizo a la pomarola', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Chorizos','Cebolla','Morrón','Tomate','Ajo'], preparation: 'Dorar chorizos y cocinar con salsa 30 min.' },
+      { name: 'Peceto mechado', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Peceto','Zanahoria','Ajo','Panceta','Vino tinto'], preparation: 'Mechar, dorar y cocinar 1½ h en caldo y vino.' },
+      { name: 'Riñones al vino tinto', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Riñones','Cebolla','Ajo','Vino tinto','Laurel'], preparation: 'Limpiar riñones, dorar y cocinar con vino 20 min.' },
+      { name: 'Supremas de cerdo al limón', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Supremas de cerdo','Limón','Miel','Ajo'], preparation: 'Marinar y dorar 10-15 min.' },
+      { name: 'Brochettes de carne y verduras', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Carne en cubos','Morrón','Cebolla','Zucchini'], preparation: 'Armar brochettes y asar.' },
+      { name: 'Carne picada a la criolla', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Carne picada','Cebolla','Morrón','Tomate','Pimentón'], preparation: 'Sofreír y cocinar 20 min.' },
+      { name: 'Hamburguesas caseras', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Carne picada','Huevo','Pan rallado','Sal','Pimienta'], preparation: 'Mezclar y formar medallones; cocinar.' },
+      { name: 'Fiambre casero de cerdo', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Carne de cerdo','Ajo','Sal','Hierbas'], preparation: 'Procesar, envolver en aluminio y hornear 1½ h.' },
+      { name: 'Bondiola braseada', category: '🥩 Capítulo 4 – Carnes de vaca y cerdo', ingredients: ['Bondiola','Cebolla','Zanahoria','Vino tinto','Caldo'], preparation: 'Dorar y cocinar 1½ h hasta tierna.' },
+
+      // --- Capítulo 5 – Pescados y mariscos
+      { name: 'Filet de merluza al horno', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Filets de merluza','Cebolla','Tomate','Limón','Aceite','Sal','Pimienta','Perejil'], preparation: 'Colocar filets en fuente, agregar verduras, rociar con limón y hornear 15-20 min.' },
+      { name: 'Filet de merluza con puré o ensalada', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Filets','Harina','Aceite','Limón'], preparation: 'Rebozar o hornear filets y servir con puré o ensalada.' },
+      { name: 'Pescado a la plancha con limón', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Filets de pescado','Limón','Aceite','Sal','Pimienta'], preparation: 'Cocinar 3-4 min por lado y rociar con limón.' },
+      { name: 'Empanadas de atún', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Atún en lata','Cebolla','Morrón','Huevos duros','Tapas para empanadas'], preparation: 'Saltear verduras, mezclar con atún y huevo, rellenar y hornear.' },
+      { name: 'Milanesas de merluza', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Filets de merluza','Huevos','Pan rallado','Ajo','Perejil'], preparation: 'Pasar por huevo y pan rallado; freír u hornear.' },
+      { name: 'Cazuela de pescado y mariscos', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Pescado blanco','Mariscos mixtos','Cebolla','Morrón','Tomate','Vino blanco','Caldo de pescado'], preparation: 'Sofreír, añadir vino, pescado y mariscos, cocinar 10-15 min.' },
+      { name: 'Fideos con atún', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Fideos','Atún','Cebolla','Ajo','Tomate'], preparation: 'Cocinar fideos y mezclar con salsa de atún.' },
+      { name: 'Arroz con calamares', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Calamares','Arroz','Cebolla','Morrón','Tomate','Caldo de pescado'], preparation: 'Rehogar, añadir calamares, arroz y caldo; cocinar 20 min.' },
+      { name: 'Tacos de pescado', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Pescado blanco','Limón','Harina','Tortillas','Col','Salsas'], preparation: 'Rebozar y freír pescado; armar tacos con toppings.' },
+      { name: 'Sushi clásico (básico)', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Arroz para sushi','Vinagre','Azúcar','Sal','Pescado fresco','Nori'], preparation: 'Preparar arroz aliñado, colocar relleno en nori y enrollar.' },
+      { name: 'Sushi vegetariano', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Arroz','Nori','Palta','Pepino','Zanahoria'], preparation: 'Rellenar con verduras y enrollar.' },
+      { name: 'Pescado en papillote', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Filets','Verduras','Limón','Hierbas'], preparation: 'Cerrar en papillote y hornear 15-20 min.' },
+      { name: 'Pescado al verdeo', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Filets','Cebolla de verdeo','Crema'], preparation: 'Saltear verdeo y crema; verter sobre pescado cocido.' },
+      { name: 'Pescado al ajillo', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Filets','Ajo','Aceite','Perejil'], preparation: 'Dorar ajos y verter sobre filets dorados.' },
+      { name: 'Buñuelos de pescado', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Pescado desmenuzado','Huevos','Harina','Perejil'], preparation: 'Mezclar, formar buñuelos y freír.' },
+      { name: 'Merluza a la crema', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Filets','Cebolla','Crema','Mostaza (opcional)'], preparation: 'Dorar cebolla, agregar merluza y crema hasta espesar.' },
+      { name: 'Croquetas de atún', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Atún','Papa','Huevo','Pan rallado'], preparation: 'Mezclar y formar croquetas; empanar y freír.' },
+      { name: 'Ceviche suave', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Pescado blanco','Jugo de limón','Cebolla morada','Cilantro','Tomate'], preparation: 'Marinar pescado en limón 15-20 min y agregar vegetales.' },
+      { name: 'Tarta de atún y tomate', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Atún','Tomates','Cebolla','Huevos','Masa para tarta'], preparation: 'Mezclar relleno y hornear sobre masa.' },
+      { name: 'Ensalada de mar', category: '🐟 Capítulo 5 – Pescados y mariscos', ingredients: ['Langostinos','Atún','Papa','Zanahoria','Limón'], preparation: 'Mezclar ingredientes y aderezar.' },
+
+      // --- Capítulo 6 – Pastas, pizzas y salsas
+      { name: 'Fideos con bolognesa', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Fideos','Carne picada','Tomate','Cebolla','Ajo','Vino tinto'], preparation: 'Preparar tuco con carne y servir con fideos.' },
+      { name: 'Lasagna clásica', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Placas de lasagna','Boloñesa','Bechamel','Mozzarella','Queso rallado'], preparation: 'Intercalar capas y hornear 30-40 min.' },
+      { name: 'Ñoquis de papa (29 del mes)', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Papas','Harina 0000','Huevo','Nuez moscada'], preparation: 'Preparar masa de papa, formar ñoquis y hervir hasta flotar.' },
+      { name: 'Pizzeta rúcula y jamón crudo', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Masa','Salsa de tomate','Mozzarella','Rúcula','Jamón crudo'], preparation: 'Hornear base y añadir rúcula y jamón al salir del horno.' },
+      { name: 'Focaccia con romero', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Harina','Levadura','Aceite','Romero','Sal gruesa'], preparation: 'Amasar, leudar, estirar y hornear con aceite y romero.' },
+      { name: 'Salsa pesto casero', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Albahaca','Piñones','Parmesano','Ajo','Aceite'], preparation: 'Procesar ingredientes hasta obtener salsa.' },
+      { name: 'Ravioles de ricota y nuez', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Masa de pasta','Ricota','Nueces','Queso'], preparation: 'Rellenar masa y hervir ravioles.' },
+      { name: 'Salsa blanca (bechamel)', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Manteca','Harina','Leche','Nuez moscada'], preparation: 'Hacer roux y agregar leche hasta espesar.' },
+      { name: 'Salsa roquefort para pasta', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Roquefort','Crema de leche','Pimienta'], preparation: 'Derretir queso en crema y servir.' },
+      { name: 'Canelones de verdura', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Panqueques','Ricota','Espinaca','Queso','Salsa mixta'], preparation: 'Rellenar panqueques, cubrir con salsa y gratinar.' },
+      { name: 'Masa básica de pasta casera', category: '🍝 Capítulo 6 – Pastas, pizzas y salsas', ingredients: ['Harina 0000','Huevos'], preparation: 'Formar masa, amasar 10-15 min y reposar.' },
+
+      // --- Capítulo 7 – Pizzas y combinaciones
+      { name: 'Pizza mozzarella clásica', category: '🍕 Capítulo 7 – Pizzas y combinaciones', ingredients: ['Masa de pizza','Salsa de tomate','Mozzarella','Orégano'], preparation: 'Estirar masa, cubrir y hornear.' },
+      { name: 'Pizza napolitana', category: '🍕 Capítulo 7 – Pizzas y combinaciones', ingredients: ['Masa','Tomate','Ajo','Albahaca','Mozzarella'], preparation: 'Hornear con ingredientes frescos.' },
+      { name: 'Pizza fugazzeta', category: '🍕 Capítulo 7 – Pizzas y combinaciones', ingredients: ['Masa','Cebolla','Mozzarella'], preparation: 'Rellenar con cebolla y queso; hornear.' },
+      { name: 'Pizza cuatro quesos', category: '🍕 Capítulo 7 – Pizzas y combinaciones', ingredients: ['Masa','Mozzarella','Fontina','Provolone','Roquefort'], preparation: 'Cubrir con quesos y hornear.' },
+
+      // --- Capítulo 8 – Comidas vegetarianas y sin carne
+      { name: 'Hamburguesas de lentejas', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Lentejas cocidas','Cebolla','Ajo','Pan rallado','Huevo (opcional)','Especias'], preparation: 'Procesar lentejas, formar hamburguesas y cocinar.' },
+      { name: 'Milanesas de berenjena', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Berenjenas','Harina','Huevo','Pan rallado'], preparation: 'Pasar berenjenas por harina, huevo y pan rallado; freír u hornear.' },
+      { name: 'Empanadas de humita', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Choclo desgranado','Cebolla','Manteca','Leche','Harina','Queso'], preparation: 'Hacer relleno de choclo, poner en tapas y hornear.' },
+      { name: 'Albóndigas de quinoa', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Quinoa cocida','Cebolla','Zanahoria','Huevo','Pan rallado'], preparation: 'Formar albóndigas y hornear o freír.' },
+      { name: 'Curry de garbanzos (vegetariano)', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Garbanzos cocidos','Cebolla','Ajo','Curry','Leche de coco','Tomate'], preparation: 'Rehogar y cocinar con leche de coco 15-20 min.' },
+      { name: 'Tarta de verduras al horno', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Masa para tarta', 'Zanahorias', 'Cebolla', 'Zapallo', 'Espinaca', 'Queso', 'Huevos', 'Crema o leche', 'Sal', 'Pimienta'], preparation: 'Rehogar verduras, mezclar con huevo y crema, colocar en molde y cocinar 35-40 min a 180°C.', time: '40 min', portions: '6' },
+      { name: 'Buñuelos de acelga', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Acelga cocida y picada','Cebolla','Huevos','Harina','Queso rallado','Sal','Aceite'], preparation: 'Mezclar todos los ingredientes hasta obtener una masa, formar buñuelos y freír hasta dorar.', time: '35 min', portions: '4' },
+      { name: 'Fideos con tomate y albahaca', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Fideos','Tomates','Ajo','Albahaca fresca','Aceite de oliva'], preparation: 'Cocinar los fideos y mezclarlos con salsa de tomate, ajo y albahaca.', time: '25 min', portions: '4' },
+      { name: 'Croquetas de arroz y queso', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Arroz cocido','Queso rallado','Huevo','Pan rallado','Sal','Pimienta'], preparation: 'Formar croquetas, pasar por pan rallado y freír u hornear.', time: '30 min', portions: '4' },
+      { name: 'Zapallitos rellenos vegetarianos', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Zapallitos','Cebolla','Morrón','Tomate','Ricota','Queso rallado','Pan rallado'], preparation: 'Vaciar zapallitos, saltear verduras, mezclar con ricota y queso, rellenar y hornear 30 min.', time: '40 min', portions: '4' },
+      { name: 'Revuelto gramajo sin carne', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Papas fritas','Cebolla','Huevos','Arvejas','Sal','Pimienta'], preparation: 'Saltear cebolla, agregar papas y arvejas, incorporar huevos batidos y revolver.', time: '20 min', portions: '3' },
+      { name: 'Pan de lentejas', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Lentejas cocidas','Harina','Huevo','Cebolla','Ajo'], preparation: 'Procesar lentejas, mezclar con harina y huevo, hornear 40 min a 180°C.', time: '50 min', portions: '8' },
+      { name: 'Arroz yamani con lentejas', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Arroz yamani','Lentejas cocidas','Cebolla','Zanahoria','Caldo'], preparation: 'Rehogar cebolla y zanahoria, agregar arroz y caldo, cocinar y mezclar con lentejas.', time: '40 min', portions: '4' },
+      { name: 'Milanesas de soja', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Soja texturizada hidratada','Huevo o mezcla vegetal','Pan rallado','Ajo','Perejil'], preparation: 'Formar milanesas y freír u hornear.', time: '30 min', portions: '4' },
+      { name: 'Ensalada tibia de calabaza y queso', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Calabaza asada','Queso fresco','Rúcula','Nueces','Aceite de oliva'], preparation: 'Asar calabaza, mezclar con queso, rúcula y nueces, aderezar con aceite.', time: '35 min', portions: '4' },
+      { name: 'Curry de verduras con coco', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Verduras variadas','Curry','Leche de coco','Caldo','Aceite'], preparation: 'Saltear verduras con curry, agregar leche de coco y caldo, cocinar hasta tierno.', time: '40 min', portions: '4' },
+      { name: 'Pan de papa con espinaca', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Papas','Espinaca','Harina','Huevo','Queso rallado'], preparation: 'Mezclar ingredientes y hornear 35-40 min.', time: '60 min', portions: '6' },
+      { name: 'Tarta integral de cebolla y queso', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Masa integral','Cebollas','Huevos','Queso crema','Queso rallado','Sal','Pimienta'], preparation: 'Rehogar cebollas, mezclar con huevo y queso, colocar en masa y hornear.', time: '40 min', portions: '6' },
+      { name: 'Guiso vegetariano de lentejas', category: '🥦 Capítulo 8 – Comidas vegetarianas y sin carne', ingredients: ['Lentejas','Zanahoria','Papa','Cebolla','Tomate','Pimentón','Caldo'], preparation: 'Rehogar verduras, agregar lentejas y caldo, cocinar 45 min.', time: '50 min', portions: '6' },
+
+
+      // --- Capítulo 9 – Tartas, masas y panificados
+      { name: 'Pan rallado casero', category: '🥧 Capítulo 9 – Tartas, masas y panificados', ingredients: ['Pan duro'], preparation: 'Secar pan y procesar para obtener pan rallado.' },
+      { name: 'Tarta integral de cebolla y queso', category: '🥧 Capítulo 9 – Tartas, masas y panificados', ingredients: ['Masa integral','Cebolla','Queso'], preparation: 'Rellenar masa con cebolla rehogada y queso; hornear.' },
+
+      // --- Capítulo 10 – Dulces, postres y meriendas
+      { name: 'Flan casero con dulce de leche', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Huevos','Leche','Azúcar','Vainilla','Dulce de leche'], preparation: 'Hacer caramelo, mezclar ingredientes, cocinar a baño María 45-60 min.' },
+      { name: 'Tarta de manzanas clásica', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Masa de tarta','Manzanas','Azúcar','Canela','Manteca'], preparation: 'Rellenar masa con manzanas y hornear 40 min.' },
+      { name: 'Panqueques con dulce de leche', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Harina 0000','Leche','Huevos','Manteca','Dulce de leche'], preparation: 'Preparar masa, cocinar panqueques y rellenar.' },
+      { name: 'Mousse de chocolate fácil', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Chocolate semiamargo','Huevos','Azúcar','Crema'], preparation: 'Derretir chocolate, mezclar con yemas y claras, refrigerar 4 h.' },
+      { name: 'Brownies de chocolate húmedos', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Chocolate','Manteca','Azúcar','Huevos','Harina'], preparation: 'Derretir chocolate, mezclar y hornear 20-25 min.' },
+      { name: 'Budín de pan clásico', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Pan duro','Leche','Huevos','Azúcar','Vainilla','Caramelo'], preparation: 'Remojar pan, mezclar y cocinar a baño María 50-60 min.' },
+      { name: 'Tiramisú rápido (sin Amaretto)', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Vainillas','Mascarpone','Huevos','Azúcar','Café fuerte','Cacao'], preparation: 'Montar capas de vainillas y crema; refrigerar 6 h.' },
+      { name: 'Crema pastelera básica', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Leche','Azúcar','Yemas','Maicena','Vainilla'], preparation: 'Cocinar hasta espesar y enfriar.' },
+      { name: 'Volcán de chocolate (coulant)', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Chocolate','Manteca','Huevos','Azúcar','Harina'], preparation: 'Hornear 10-12 min para centro líquido.' },
+      { name: 'Bizcochuelo genovés', category: '🍰 Capítulo 10 – Dulces, postres y meriendas', ingredients: ['Huevos','Azúcar','Harina','Vainilla'], preparation: 'Batir huevos con azúcar y hornear 35-40 min.' }
+    ];
+
+    /********************************************************************
+     * UI & logic
+     ********************************************************************/
+    const recipeList = document.getElementById('recipeList');
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const recipeModal = document.getElementById('recipeModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalMeta = document.getElementById('modalMeta');
+    const modalIngredients = document.getElementById('modalIngredients');
+    const modalPreparation = document.getElementById('modalPreparation');
+    const closeModal = document.getElementById('closeModal');
+    const summary = document.getElementById('summary');
+    const sidebarSummary = document.getElementById('sidebarSummary');
+    const mobileSummary = document.getElementById('mobileSummary');
+    const chaptersList = document.getElementById('chaptersList');
+    const mobileChapters = document.getElementById('mobileChapters');
+    const btnAll = document.getElementById('btnAll');
+    const categorySelect = categoryFilter;
+
+    // Build categories (unique) preserving PDF chapter names order roughly by first occurrence
+    const categoryOrder = [];
+    const catSet = new Set();
+    recipes.forEach(r => {
+      if (!catSet.has(r.category)) {
+        catSet.add(r.category);
+        categoryOrder.push(r.category);
+      }
+    });
+
+    // Populate category select, sidebar list and mobile list
+    categoryOrder.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      categorySelect.appendChild(opt);
+
+      const li = document.createElement('li');
+      li.innerHTML = `<button class="w-full text-left px-2 py-2 rounded hover:bg-rose-50" data-cat="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`;
+      chaptersList.appendChild(li);
+
+      const liM = document.createElement('li');
+      liM.innerHTML = `<button class="w-full text-left px-2 py-2 rounded hover:bg-gray-100" data-cat="${escapeHtml(cat)}">${escapeHtml(cat)}</button>`;
+      mobileChapters.appendChild(liM);
+    });
+
+    // Summary header
+    const totalRecipes = recipes.length;
+    summary.textContent = `Mostrando ${totalRecipes} de ${totalRecipes} recetas.`;
+    sidebarSummary.textContent = `${totalRecipes} recetas en total`;
+    mobileSummary.textContent = `${totalRecipes} recetas`;
+
+    // Event: clicking chapter in sidebar or mobile filters category
+    function attachChapterClicks() {
+      document.querySelectorAll('[data-cat]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const cat = e.currentTarget.getAttribute('data-cat');
+          categoryFilter.value = cat;
+          renderRecipes();
+          // close mobile sidebar if open
+          hideMobileSidebar();
+        });
+      });
+    }
+
+    attachChapterClicks();
+
+    // Show all button
+    btnAll.addEventListener('click', () => {
+      categoryFilter.value = 'Todas';
+      renderRecipes();
+    });
+
+    // Mobile menu toggle
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const mobileSidebar = document.getElementById('mobileSidebar');
+    const mobileClose = document.getElementById('mobileClose');
+    function showMobileSidebar() { mobileSidebar.classList.remove('hidden'); }
+    function hideMobileSidebar() { mobileSidebar.classList.add('hidden'); }
+    if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', showMobileSidebar);
+    if (mobileClose) mobileClose.addEventListener('click', hideMobileSidebar);
+
+    // Render recipes grid based on search & filter
+    function renderRecipes() {
+      const term = (searchInput.value || '').trim().toLowerCase();
+      const category = categoryFilter.value;
+
+      const filtered = recipes.filter(r => {
+        const inCategory = (category === 'Todas') || (r.category === category);
+        const inTerm = !term || r.name.toLowerCase().includes(term) || r.ingredients.some(i => i.toLowerCase().includes(term));
+        return inCategory && inTerm;
+      });
+
+      summary.textContent = `Mostrando ${filtered.length} de ${recipes.length} recetas.`;
+      sidebarSummary.textContent = `${filtered.length} recetas mostradas — Total ${recipes.length}`;
+      mobileSummary.textContent = `${filtered.length} de ${recipes.length}`;
+
+      if (filtered.length === 0) {
+        recipeList.innerHTML = `
+          <div class="col-span-full text-center py-16 bg-white rounded-xl shadow border border-rose-100">
+            <h3 class="text-2xl font-bold text-rose-700">¡No se encontraron recetas!</h3>
+            <p class="text-gray-500 mt-2">Probá con otro término de búsqueda o seleccioná otra categoría.</p>
+          </div>
+        `;
+        return;
+      }
+
+      recipeList.innerHTML = filtered.map(r => `
+        <article class="bg-white rounded-xl shadow-md p-4 flex flex-col justify-between border border-rose-100">
+          <div>
+            <h3 class="text-lg font-semibold text-rose-700 mb-1">${escapeHtml(r.name)}</h3>
+            <p class="text-sm text-gray-500 mb-2">${escapeHtml(r.category)}</p>
+            <p class="text-sm text-gray-600 mb-3 line-clamp-3">${escapeHtml(shortPreview(r.preparation, 140))}</p>
+          </div>
+          <div class="mt-3">
+            <button onclick="openModal('${escapeForJs(r.name)}')" class="w-full bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700 transition">Ver receta</button>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    // Helpers
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+    function escapeForJs(str) {
+      return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+    function shortPreview(text, maxLen=120) {
+      if (!text) return '';
+      return text.length <= maxLen ? text : text.slice(0, maxLen).trim() + '...';
+    }
+
+    // Modal open by name (global)
+    window.openModal = function(name) {
+      const recipe = recipes.find(r => r.name === name);
+      if (!recipe) return;
+      modalTitle.textContent = recipe.name;
+      modalMeta.textContent = `${recipe.time ? '⏱ ' + recipe.time + (recipe.portions ? ' | ' + recipe.portions : '') : (recipe.portions ? 'Rinde: ' + recipe.portions : '')} ${recipe.category ? ' • ' + recipe.category : ''}`;
+      modalIngredients.innerHTML = (recipe.ingredients || []).map(i => `<li>${escapeHtml(i)}</li>`).join('');
+      modalPreparation.textContent = recipe.preparation || '';
+      recipeModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    };
+
+    // Close modal
+    closeModal.addEventListener('click', () => {
+      recipeModal.classList.add('hidden');
+      document.body.style.overflow = '';
+    });
+    recipeModal.addEventListener('click', e => {
+      if (e.target === recipeModal) {
+        recipeModal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    });
+
+    // Print recipe button
+    const printBtn = document.getElementById('printBtn');
+    printBtn.addEventListener('click', () => {
+      // Print only the modal contents
+      const content = document.querySelector('#recipeModal > div').innerHTML;
+      const w = window.open('', '_blank');
+      w.document.write('<html><head><title>Imprimir receta</title><meta charset="utf-8"><style>body{font-family:Arial,Helvetica,sans-serif;padding:20px} h2{color:#b91c1c}</style></head><body>');
+      w.document.write(content);
+      w.document.write('</body></html>');
+      w.document.close();
+      w.print();
+    });
+
+    // Listeners
+    searchInput.addEventListener('input', renderRecipes);
+    categoryFilter.addEventListener('change', renderRecipes);
+
+    // Initial render
+    renderRecipes();
+
+    // Re-attach chapter clicks (in case DOM nodes needed)
+    attachChapterClicks();
+
+    // Accessibility: allow Escape to close modal
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (!recipeModal.classList.contains('hidden')) {
+          recipeModal.classList.add('hidden');
+          document.body.style.overflow = '';
+        }
+        hideMobileSidebar();
+      }
+    });
+
+    /********************************************************************
+     * Si detectás recetas faltantes o querés que:
+     * - agregue imágenes sugeridas,
+     * - añada tiempos y porciones (si figuran en el PDF) a cada receta,
+     * - importe las recetas desde un JSON externo o las guarde en localStorage,
+     * decímelo y lo incorporo.
+     ********************************************************************/
+  </script>
+</body>
+</html>
